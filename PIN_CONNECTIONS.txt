@@ -1,0 +1,165 @@
+================================================================================
+                    MED_WASTE_BOT - COMPLETE PIN CONNECTIONS
+================================================================================
+
+--------------------------------------------------------------------------------
+1. ARDUINO UNO (Motor Driver, Line Following & Obstacle Sensor)
+--------------------------------------------------------------------------------
+
+[TB6612FNG Motor Driver]
+  * PWMA  -------> Arduino Uno Pin D5  (PWM speed control Motor A)
+  * AIN1  -------> Arduino Uno Pin D3  (Direction 1 Motor A)
+  * AIN2  -------> Arduino Uno Pin D2  (Direction 2 Motor A)
+  * PWMB  -------> Arduino Uno Pin D6  (PWM speed control Motor B)
+  * BIN1  -------> Arduino Uno Pin D4  (Direction 1 Motor B)
+  * BIN2  -------> Arduino Uno Pin D7  (Direction 2 Motor B)
+  * STBY  -------> 5V (Hardwired directly to 5V to enable driver)
+  * VM    -------> Motor Power Source (e.g., 7.4V - 12V Battery)
+  * VCC   -------> Arduino 5V
+  * GND   -------> Arduino GND (Common Ground with Battery)
+
+[HC-SR04 Ultrasonic Sensor (Obstacle / Person Detection)]
+  * VCC   -------> Arduino 5V
+  * TRIG  -------> Arduino Uno Pin D8
+  * ECHO  -------> Arduino Uno Pin D9
+  * GND   -------> Arduino GND
+
+[5-Channel Analog Line Tracking Sensor Array]
+  * VCC   -------> Arduino 5V
+  * GND   -------> Arduino GND
+  * OUT 1 -------> Arduino Uno Pin A0 (Far Left)
+  * OUT 2 -------> Arduino Uno Pin A1 (Mid Left)
+  * OUT 3 -------> Arduino Uno Pin A2 (Center)
+  * OUT 4 -------> Arduino Uno Pin A3 (Mid Right)
+  * OUT 5 -------> Arduino Uno Pin A4 (Far Right)
+  * (NOTE: Black < threshold, White > threshold. All-black starting base & dump area <= 200, Black guide line < 500, White floor > 500)
+
+[Dedicated Serial Connection to Unit 1 (ESP32-C3) or Unit 2 (NodeMCU ESP8266)]
+  * Unit 1 Robot (ESP32-C3):
+      - Arduino Pin D11 (ESP_TX_PIN) ------> ESP32-C3 GPIO 2 (UNO_RX)
+      - Arduino Pin D10 (ESP_RX_PIN) <------ ESP32-C3 GPIO 3 (UNO_TX)
+      - Arduino GND                  <------> ESP32-C3 GND (CRITICAL: Common Ground!)
+  * Unit 2 Robot (NodeMCU ESP8266):
+      - Arduino Pin D11 (ESP_TX_PIN) ------> NodeMCU Pin D5 / GPIO 14 (UNO_RX) [Use 1k:2k divider if 5V]
+      - Arduino Pin D10 (ESP_RX_PIN) <------ NodeMCU Pin D7 / GPIO 13 (UNO_TX)
+      - Arduino GND                  <------> NodeMCU GND (CRITICAL: Common Ground!)
+  * (Pins D0 and D1 on Arduino Uno and USB TX/RX on NodeMCU remain 100% free for USB Serial Monitor & flashing)
+
+
+--------------------------------------------------------------------------------
+2A. UNIT 1 CONTROLLER: ESP32-C3 (master_esp32s2_webserver.ino)
+--------------------------------------------------------------------------------
+[Dedicated Hardware Serial 1 to Uno]
+  * GPIO 2 (UNO_RX) <------ Arduino Uno Pin D11 (ESP_TX_PIN)
+  * GPIO 3 (UNO_TX) ------> Arduino Uno Pin D10 (ESP_RX_PIN)
+  * GND             <------> Arduino Uno GND
+
+[HC-SR04 Ultrasonic Sensor (Trash Bin Level Monitoring)]
+  * VCC   -------> 5V
+  * TRIG  -------> ESP32-C3 GPIO 4
+  * ECHO  -------> ESP32-C3 GPIO 5 (Note: Use a 1k:2k voltage divider if echo is 5V)
+  * GND   -------> ESP32-C3 GND
+
+[DRV8825 Stepper Motor Driver (Disposal / Tilting Mechanism: 90 deg -> -20 deg)]
+  * DIR   -------> ESP32-C3 GPIO 19
+  * STEP  -------> ESP32-C3 GPIO 18
+  * EN    -------> ESP32-C3 GPIO 7 (Active LOW - kept LOW so the stepper holds upright)
+  * VMOT  -------> Motor Battery Power (8.2V - 45V) + 100uF Capacitor to GND
+  * GND   -------> Common Ground (Power & Logic GND)
+  * RESET -------> Connect directly to SLEEP pin (or 3.3V) to keep driver awake
+  * SLEEP -------> Connect directly to RESET pin
+  * M0, M1, M2 --> GND or Floating (for Full Step mode: 200 steps/rev, ~61 steps for 110 deg tilt)
+  * B2, B1, A1, A2 -> Stepper Motor 4-wire leads
+  * FAULT -------> Leave disconnected (Optional error output)
+
+[Servo Motor (Trash Bin Lid Opener)]
+  * PWM / Signal -> ESP32-C3 GPIO 6
+  * VCC (Red)   --> External 5V / 6V Power Supply (Avoid powering directly from ESP32 pin)
+  * GND (Brown/Black) -> Common Ground
+
+
+--------------------------------------------------------------------------------
+2B. UNIT 2 CONTROLLER: NODEMCU ESP8266 (slave_esp32s2_client.ino)
+--------------------------------------------------------------------------------
+NOTE ON NODEMCU ESP8266 (ESP-12E) PINOUT:
+  * All 8 Unit 2 signals are mapped to boot-safe NodeMCU pins D0 through D7 so the board
+    boots and flashes reliably without ever needing to unplug wires:
+
+[Dedicated SoftwareSerial to Unit 2 Arduino Uno]
+  * Pin D5 (GPIO 14 / UNO_RX) <------ Unit 2 Arduino Uno Pin D11 (ESP_TX_PIN)
+  * Pin D7 (GPIO 13 / UNO_TX) ------> Unit 2 Arduino Uno Pin D10 (ESP_RX_PIN)
+  * GND                       <------> Unit 2 Arduino Uno GND (Common Ground!)
+
+[HC-SR04 Ultrasonic Sensor (Unit 2 Trash Bin Level Monitoring)]
+  * VCC   -------> 5V (VIN / VU or External 5V)
+  * TRIG  -------> NodeMCU Pin D1 (GPIO 5)
+  * ECHO  -------> NodeMCU Pin D2 (GPIO 4) [Use 1k:2k voltage divider for 3.3V safety]
+  * GND   -------> NodeMCU GND
+
+[DRV8825 Stepper Motor Driver (Unit 2 Disposal / Tilting Mechanism: 90 deg -> -20 deg)]
+  * DIR   -------> NodeMCU Pin D3 (GPIO 0)
+  * STEP  -------> NodeMCU Pin D4 (GPIO 2)
+  * EN    -------> NodeMCU Pin D0 (GPIO 16) [Active LOW - kept LOW for holding torque]
+  * VMOT  -------> Motor Battery Power (8.2V - 45V) + 100uF Capacitor to GND
+  * RESET & SLEEP -> Tied together
+  * GND   -------> Common Ground (Power & Logic GND)
+
+[Servo Motor (Unit 2 Trash Bin Lid Opener)]
+  * PWM / Signal -> NodeMCU Pin D6 (GPIO 12 ~ PWM)
+  * VCC (Red)   --> External 5V / 6V Power Supply
+  * GND (Brown/Black) -> Common Ground
+
+--------------------------------------------------------------------------------
+3. STANDALONE DUAL-WEBSERVER ARCHITECTURE (UNIT 1 & UNIT 2)
+--------------------------------------------------------------------------------
+  * Both Unit 1 and Unit 2 run 100% identical, independent full web dashboards:
+    - Unit 1 (ESP32-C3):
+      * AP Hotspot SSID: "MedWaste-1-AP" (Default Password: "medwaste123")
+      * Local mDNS URL: http://medwaste1.local (or 192.168.4.1 on AP)
+    - Unit 2 (NodeMCU ESP8266):
+      * AP Hotspot SSID: "MedWaste-2-AP" (Default Password: "medwaste123")
+      * Local mDNS URL: http://medwaste2.local (or 192.168.4.1 on AP)
+    - Flash ROM Persistence: History logs, disposal counts, calibration, schedules,
+      Wi-Fi credentials, and AP passwords are saved across power cycles on both units.
+    - Cold Power-On Auto-Reset: Both ESP32-C3 and NodeMCU detect cold power-on boots
+      and execute an automatic clean software reset after power rail stabilization.
+
+--------------------------------------------------------------------------------
+4. CONTROLLED GRADUAL STEPPER TILT, OPEN LID FIRST & REVERSE RETURN
+--------------------------------------------------------------------------------
+  * Upright Reference: 90 degrees (12 o'clock vertical)
+  * Dump Target: 210 degrees (8 o'clock, counter-clockwise 120-degree travel)
+  * Holding Torque & Controlled Motion:
+    - DRV8825 EN_PIN is kept LOW continuously so holding torque never drops and the bin never falls.
+    - Uses trapezoidal smooth acceleration ramp (from 85ms to 35ms step interval, ~2.9s duration)
+      for gentle, quiet, careful tilting without sudden jerks or motor stalling.
+    - Direction invert setting (/invert_dir) is accessible in the dashboard to reverse CCW/CW if needed.
+  * Simplified Direct Forward-and-Reverse Disposal Sequence:
+    1) Moving to Disposal: Robot starts at Initial Station and follows line FORWARD.
+    2) Disposal Detection: When ALL 5 sensors detect black, the robot STOPS immediately.
+       (No 180-degree turn before tilting!). Uno signals ARRIVED_DISPOSAL.
+    3) Open Lid First: Controller engages the lid servo to 90 degrees and waits 700ms so the
+       lid is fully open before the bin tilts.
+    4) Gradual Tilt 3x: Stepper tilts CCW from 12 o'clock (90 deg) to 8 o'clock (210 deg),
+       holds for calibrated dump duration, returns to 12 o'clock, and repeats 3 times.
+    5) Close Lid: Stepper returns to 12 o'clock upright, and the lid servo closes the lid shut (0 deg).
+    6) Backward Return: Controller instructs Uno RETURN_TO_BASE. Uno runs BACKWARD along the line.
+    7) Base Detection: When ALL 5 sensors detect black at the Initial Station, the robot STOPS in IDLE.
+       The robot is already parked facing forward, ready for the next disposal cycle!
+
+--------------------------------------------------------------------------------
+5. HANDS-FREE PROXIMITY LID OPENING & FULL BIN LOCKING SPECIFICATION
+--------------------------------------------------------------------------------
+  * Idle / Parked Mode (Stationary at Base, Not Running, Not Disposing):
+    - Front Ultrasonic Sensor (Arduino Pins D8/D9) functions as a touchless proximity sensor.
+    - When a person approaches (distance < 50 cm threshold), Uno signals OPEN_LID over
+      dedicated UART (D10/D11) to the controller.
+    - Controller engages the lid servo to 90 degrees for the calibrated hold duration (default 5000 ms),
+      then closes smoothly.
+  * Active Running / Disposing Mode:
+    - While moving, spinning, or dumping, the front ultrasonic sensor acts exclusively as an
+      emergency obstacle avoidance sensor and hands-free lid opening is disabled.
+  * Full Bin Overflow Prevention (Lockout):
+    - When waste depth reaches the Full threshold (default <= 10 cm), the controller sends
+      "BIN_FULL,1" to the Arduino Uno, locking the lid shut until a disposal cycle completes.
+================================================================================
